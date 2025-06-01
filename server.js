@@ -13,6 +13,9 @@ if (!process.env.ERRORBOT_CHAT) {
     throw new Error("ERRORBOT_CHAT environment variable not set.");
 }
 
+const httpPort = 4000;
+const botPort = 4001;
+
 const token = process.env.ERRORBOT_TOKEN;
 const url = process.env.ERRORBOT_URL;
 const chat = process.env.ERRORBOT_CHAT;
@@ -20,15 +23,14 @@ const chat = process.env.ERRORBOT_CHAT;
 const bot = new Telegraf(token);
 const init = async () => {
   console.log('[Boot] Starting bot');
-  bot.launch({ webhook: { domain: url, port: 5001 } });
-  console.log('[Boot] Let\'s go!');
+  bot.launch({ webhook: { domain: url, port: botPort } });
+  console.log('[Boot] Bot ready on port ' + botPort);
 }
 init();
 
 
 // html server
 const app = express();
-const port = 4000;
 app.use(express.json());
 
 app.post('/', (req, res) => {
@@ -42,6 +44,15 @@ app.post('/', (req, res) => {
   bot.telegram.sendMessage(chat, JSON.stringify(req.body));
 })
 
-app.listen(port, () => {
-  console.log('[Boot] Listening on port ' + port);
+app.listen(httpPort, () => {
+  console.log('[Boot] Listening for http on port ' + httpPort);
 })
+
+process.on('SIGTERM', () => {
+  console.log('[Shutdown] SIGTERM shutdown');
+  process.exit(1)
+});
+process.on('SIGINT', () => {
+  console.log('[Shutdown] SIGINT shutdown');
+  process.exit(1)
+});
