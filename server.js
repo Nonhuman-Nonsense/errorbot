@@ -3,11 +3,14 @@ const environment = process.env.NODE_ENV ?? "production";
 const express = require("express");
 const { Telegraf } = require('telegraf');
 
-if (!process.env.ERRORBOT_TOKEN) {
-  throw new Error("ERRORBOT_TOKEN environment variable not set.");
-}
 if (!process.env.ERRORBOT_URL) {
   throw new Error("ERRORBOT_URL environment variable not set.");
+}
+if (!process.env.ERRORBOT_INGEST_KEY) {
+  throw new Error("ERRORBOT_INGEST_KEY environment variable not set.");
+}
+if (!process.env.ERRORBOT_TOKEN) {
+  throw new Error("ERRORBOT_TOKEN environment variable not set.");
 }
 if (!process.env.ERRORBOT_CHAT) {
   throw new Error("ERRORBOT_CHAT environment variable not set.");
