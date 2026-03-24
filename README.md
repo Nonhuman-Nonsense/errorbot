@@ -1,20 +1,41 @@
 # Council of Errors
 
-A Telegram relay bot for error messaging and system monitoring.
+A Telegram relay service for application error reporting.
 
 ## Features
-1.  **HTTP Relay**: Accepts POST requests and forwards the JSON body to a Telegram chat.
-2.  **Docker Monitor**: Listens to the local Docker engine for `health_status: unhealthy` events and automatically alerts when a container fails.
+
+1. **HTTP relay**: accepts JSON reports and forwards them to a Telegram chat.
+2. **Authenticated ingest**: optional shared-key auth via `X-Errorbot-Key`.
+3. **Health endpoint**: lightweight `/health` endpoint for probes.
+
+## Endpoints
+
+- `POST /ingest` - preferred ingest route for error reports.
+- `POST /` - legacy ingest route (kept for backward compatibility).
+- `GET /health` - returns service health JSON.
 
 ## Configuration
-The application requires the following environment variables:
 
--   `ERRORBOT_TOKEN`: Your Telegram Bot API Token.
--   `ERRORBOT_CHAT`: The Chat ID to send messages to.
--   `ERRORBOT_URL`: The public URL (used for Telegram Webhook).
+Required:
+
+- `ERRORBOT_TOKEN`: Telegram Bot API token.
+- `ERRORBOT_CHAT`: Telegram chat ID to send messages to.
+- `ERRORBOT_URL`: public URL used by the Telegram webhook setup.
+
+Optional:
+
+- `ERRORBOT_INGEST_KEY`: when set, requests to `/ingest` and `/` must include `X-Errorbot-Key`.
+
+## Reporter configuration
+
+On services that report errors (for example on another droplet):
+
+- `COUNCIL_ERRORBOT=https://error.<your-domain>/ingest`
+- `COUNCIL_ERRORBOT_KEY=<same value as ERRORBOT_INGEST_KEY>`
 
 ## Running with Docker
-To enable the Docker monitoring feature, you **must** mount the Docker socket into the container.
+
+Minimal setup:
 
 ```yaml
 services:
@@ -24,18 +45,24 @@ services:
       - ERRORBOT_TOKEN=...
       - ERRORBOT_CHAT=...
       - ERRORBOT_URL=...
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ERRORBOT_INGEST_KEY=...
 ```
 
-## Build docker image
+If you use Docker event monitoring in this service, also mount the Docker socket:
 
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
+
+## Build Docker image
+
+```bash
 docker build . -t nonhumannonsense/council-of-errors:latest
 docker push nonhumannonsense/council-of-errors:latest
 ```
 
-on Apple silicon, you might need to add `--platform linux/amd64` or similar to the build command
+On Apple Silicon, you may need `--platform linux/amd64` in the build command.
 
 ### Licence
 
