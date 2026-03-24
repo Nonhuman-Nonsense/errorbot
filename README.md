@@ -1,4 +1,4 @@
-# Council of Errors
+# Errorbot
 
 A Telegram relay service for application error reporting.
 
