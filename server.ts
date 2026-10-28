@@ -98,9 +98,6 @@ const init = async () => {
 };
 
 const verifyIngestAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!ingestKey) {
-    return next();
-  }
   const providedKey = req.get('X-Errorbot-Key');
   if (!providedKey || providedKey !== ingestKey) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });

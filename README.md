@@ -5,7 +5,7 @@ A Telegram relay service for application error reporting.
 ## Features
 
 1. **HTTP relay**: accepts JSON reports and forwards them to a Telegram chat.
-2. **Authenticated ingest**: optional shared-key auth via `X-Errorbot-Key`.
+2. **Authenticated ingest**: shared-key auth via `X-Errorbot-Key`.
 3. **Health endpoint**: lightweight `/health` endpoint for probes.
 4. **Grouped repeats**: the first report of a kind is sent at once; more of the same kind within 10 minutes become one "N more like this" message when the window ends. Reports are the same kind when service, severity, source, context and the first line of the message match, with ids, numbers and UUIDs ignored (`relay.ts`).
 5. **Paced sends**: Telegram takes about 20 messages a minute into a group and loses the rest, so messages go out at most one per 3 s. On a 429 the bot waits as long as Telegram asks and sends the same message again. Up to 100 wait in line; past that it drops them and says how many.
@@ -18,15 +18,12 @@ A Telegram relay service for application error reporting.
 
 ## Configuration
 
-Required:
+All required; the server will not start without them:
 
 - `ERRORBOT_TOKEN`: Telegram Bot API token.
 - `ERRORBOT_CHAT`: Telegram chat ID to send messages to.
 - `ERRORBOT_URL`: public URL used by the Telegram webhook setup.
-
-Optional:
-
-- `ERRORBOT_INGEST_KEY`: when set, requests to `/ingest` and `/` must include `X-Errorbot-Key`.
+- `ERRORBOT_INGEST_KEY`: shared key; requests to `/ingest` and `/` must send it in `X-Errorbot-Key`, or get a 401.
 
 ## Reporter configuration
 
