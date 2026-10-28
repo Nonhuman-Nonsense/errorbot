@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatReport } from '../format.ts';
+import { formatReport } from '../src/format.ts';
 
 describe('formatReport', () => {
   it('renders critical terminal council reports', () => {

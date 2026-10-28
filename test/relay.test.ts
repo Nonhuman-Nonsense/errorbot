@@ -1,8 +1,8 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Report } from '../format.ts';
-import { createRelay, groupKey, type RelayOptions } from '../relay.ts';
+import type { Report } from '../src/format.ts';
+import { createRelay, groupKey, type RelayOptions } from '../src/relay.ts';
 
 const WINDOW_MS = 10 * 60_000;
 const INTERVAL_MS = 3_000;
