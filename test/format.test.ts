@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatReport } from '../src/format.ts';
+import { formatReport, formatUnhealthyContainer } from '../src/format.ts';
 
 describe('formatReport', () => {
   it('renders critical terminal council reports', () => {
@@ -122,5 +122,17 @@ describe('formatReport', () => {
     });
 
     assert.doesNotMatch(text, /<b>Request:<\/b>/);
+  });
+});
+
+describe('formatUnhealthyContainer', () => {
+  it('escapes names that would break the message', () => {
+    const text = formatUnhealthyContainer('my_app<1>', 'registry/my_image:latest');
+    assert.match(text, /<code>my_app&lt;1&gt;<\/code>/);
+    assert.match(text, /<code>registry\/my_image:latest<\/code>/);
+  });
+
+  it('says so when the image is not known', () => {
+    assert.match(formatUnhealthyContainer('db', undefined), /Image: <code>unknown<\/code>/);
   });
 });

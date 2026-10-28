@@ -2,7 +2,8 @@ import { existsSync } from "node:fs";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { Telegraf } from 'telegraf';
 import Docker from 'dockerode';
-import { formatRepeats, formatReport } from './format.ts';
+import { monitorDockerHealth } from './docker.ts';
+import { formatRepeats, formatReport, formatUnhealthyContainer } from './format.ts';
 import { createRelay } from './relay.ts';
 
 // Production has no .env file (env vars come from the host instead), and loadEnvFile throws ENOENT if missing.
@@ -41,60 +42,16 @@ const relay = createRelay({
   formatRepeats,
 });
 
-/** The parts of a Docker event the monitor reads. */
-interface DockerEvent {
-  id: string;
-  Action: string;
-  Actor: { Attributes: { name?: string; image?: string } };
-}
-
-const monitorDockerEvents = async () => {
-  try {
-    const docker = new Docker({ socketPath: '/var/run/docker.sock' });
-    // Check if we can talk to docker (e.g. is the socket mounted?)
-    await docker.ping();
-    console.log('[Docker] Connected to Docker socket');
-
-    const stream = await docker.getEvents({
-      filters: {
-        type: ['container'],
-        event: ['health_status']
-      }
-    });
-
-    stream.on('data', (chunk: Buffer) => {
-      try {
-        const event: DockerEvent = JSON.parse(chunk.toString());
-        // Action format example: "health_status: unhealthy"
-        if (event.Action.includes('unhealthy')) {
-          const containerName = event.Actor.Attributes.name || event.id.substring(0, 12);
-          console.log(`[Docker] Unhealthy container detected: ${containerName}`);
-          relay.notify(`⚠️ *Unhealthy Container Detected*\nName: \`${containerName}\`\nImage: \`${event.Actor.Attributes.image}\``, { parse_mode: 'Markdown' });
-        }
-      } catch (err) {
-        console.error('[Docker] Error processing event chunk', err);
-      }
-    });
-
-    stream.on('error', (err: Error) => {
-      console.error('[Docker] Event stream error', err);
-    });
-
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT' || code === 'ECONNREFUSED') {
-      console.log('[Docker] Docker socket not found or inaccessible. Monitoring disabled.');
-    } else {
-      console.error('[Docker] Failed to initialize monitoring', err);
-    }
-  }
-};
-
 const init = async () => {
   console.log('[Boot] Starting bot');
   bot.launch({ webhook: { domain: url, port: botPort } });
   console.log('[Boot] Bot ready on port ' + botPort);
-  monitorDockerEvents();
+  monitorDockerHealth({
+    docker: new Docker({ socketPath: '/var/run/docker.sock' }),
+    onUnhealthy: ({ name, image }) => relay.notify(formatUnhealthyContainer(name, image), { parse_mode: 'HTML' }),
+    onLost: () => relay.notify('⚠️ Lost the Docker event stream; unhealthy containers go unreported until it reconnects.'),
+    onRestored: () => relay.notify('✅ Docker event stream back; reporting unhealthy containers again.'),
+  });
 };
 
 const verifyIngestAuth = (req: Request, res: Response, next: NextFunction) => {

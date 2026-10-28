@@ -135,6 +135,15 @@ export function formatReport(body: Report): string {
   return text;
 }
 
+/** A container's health check started failing. Names go in escaped, since `_` or `<` would otherwise break the message. */
+export function formatUnhealthyContainer(name: string, image: string | undefined): string {
+  return [
+    '⚠️ <b>Unhealthy container</b>',
+    `Name: <code>${escapeHtml(name)}</code>`,
+    `Image: <code>${escapeHtml(image ?? 'unknown')}</code>`,
+  ].join('\n');
+}
+
 /**
  * The one message for reports grouped behind an earlier one (see relay.ts): how
  * many, and enough of the first to recognise it.

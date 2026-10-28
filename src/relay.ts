@@ -57,7 +57,7 @@ function isRateLimited(err: TelegramError | undefined): boolean {
 }
 
 export interface SendOptions {
-  parse_mode?: 'HTML' | 'Markdown';
+  parse_mode?: 'HTML';
 }
 
 export interface RelayOptions {
