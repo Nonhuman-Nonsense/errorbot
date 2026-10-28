@@ -65,7 +65,7 @@ Minimal setup:
 ```yaml
 services:
   errorbot:
-    image: nonhumannonsense/errorbot:latest
+    image: nonhumannonsense/error-bot:latest
     environment:
       - ERRORBOT_TOKEN=...
       - ERRORBOT_CHAT=...
@@ -83,8 +83,8 @@ volumes:
 ## Build Docker image
 
 ```bash
-docker build . -t nonhumannonsense/errorbot:latest
-docker push nonhumannonsense/errorbot:latest
+docker build . -t nonhumannonsense/error-bot:latest
+docker push nonhumannonsense/error-bot:latest
 ```
 
 On Apple Silicon, you may need `--platform linux/amd64` in the build command.

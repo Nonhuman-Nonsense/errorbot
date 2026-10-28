@@ -1,4 +1,10 @@
-require("dotenv").config();
+const { existsSync } = require("node:fs");
+
+// Production has no .env file (env vars come from the host instead), and loadEnvFile throws ENOENT if missing.
+if (existsSync(".env")) {
+  process.loadEnvFile(".env");
+}
+
 const environment = process.env.NODE_ENV ?? "production";
 const express = require("express");
 const { Telegraf } = require('telegraf');
