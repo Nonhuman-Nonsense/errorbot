@@ -9,11 +9,13 @@ A Telegram relay service for application error reporting.
 3. **Health endpoint**: lightweight `/health` endpoint for probes.
 4. **Grouped repeats**: the first report of a kind is sent at once; more of the same kind within 10 minutes become one "N more like this" message when the window ends. Reports are the same kind when service, severity, source, context and the first line of the message match, with ids, numbers and UUIDs ignored (`src/relay.ts`).
 5. **Paced sends**: Telegram takes about 20 messages a minute into a group and loses the rest, so messages go out at most one per 3 s. On a 429 the bot waits as long as Telegram asks and sends the same message again. Up to 100 wait in line; past that it drops them and says how many.
+6. **Unhealthy containers**: with the Docker socket mounted, the bot also reports containers whose health check fails. If it loses Docker's event stream it says so in the chat and reconnects (`src/docker.ts`).
+
+The bot only sends to its chat; it never reads it, so there is no webhook.
 
 ## Endpoints
 
-- `POST /ingest` - preferred ingest route for error reports.
-- `POST /` - legacy ingest route (kept for backward compatibility).
+- `POST /ingest` - takes error reports.
 - `GET /health` - returns service health JSON.
 
 ## Configuration
@@ -22,8 +24,7 @@ All required; the server will not start without them:
 
 - `ERRORBOT_TOKEN`: Telegram Bot API token.
 - `ERRORBOT_CHAT`: Telegram chat ID to send messages to.
-- `ERRORBOT_URL`: public URL used by the Telegram webhook setup.
-- `ERRORBOT_INGEST_KEY`: shared key; requests to `/ingest` and `/` must send it in `X-Errorbot-Key`, or get a 401.
+- `ERRORBOT_INGEST_KEY`: shared key; requests to `/ingest` must send it in `X-Errorbot-Key`, or get a 401.
 
 ## Reporter configuration
 
@@ -57,7 +58,7 @@ If HTML formatting fails, the bot falls back to `JSON.stringify(body)`.
 
 ## Development
 
-Needs Node 24.2 or later. The code is TypeScript that Node runs directly (type stripping), so there is no build step; `tsc` only checks types.
+Needs Node 24 or later. The code is TypeScript that Node runs directly (type stripping), so there is no build step; `tsc` only checks types.
 
 - `npm run dev` - runs the server and restarts it on changes.
 - `npm test` - type-checks, then runs the tests.
@@ -75,7 +76,6 @@ services:
     environment:
       - ERRORBOT_TOKEN=...
       - ERRORBOT_CHAT=...
-      - ERRORBOT_URL=...
       - ERRORBOT_INGEST_KEY=...
 ```
 

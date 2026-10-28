@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import type { Report } from '../src/format.ts';
 import { createRelay, groupKey, type RelayOptions } from '../src/relay.ts';
+import { TelegramError } from '../src/telegram.ts';
 
 const WINDOW_MS = 10 * 60_000;
 const INTERVAL_MS = 3_000;
@@ -15,9 +16,7 @@ const settle = async () => {
 const quietLog = { warn: () => {}, error: () => {} };
 
 function rateLimited(retryAfterSeconds: number) {
-  return Object.assign(new Error('429: Too Many Requests'), {
-    response: { error_code: 429, parameters: { retry_after: retryAfterSeconds } },
-  });
+  return new TelegramError(429, 'Too Many Requests', retryAfterSeconds);
 }
 
 function setup({ send = async () => {}, maxQueue }: { send?: RelayOptions['send']; maxQueue?: number } = {}) {
@@ -102,7 +101,7 @@ describe('relay', () => {
   it('falls back to plain text when the formatted message is refused', async () => {
     const { relay, sent } = setup({
       send: async (text) => {
-        if (text.startsWith('report:')) throw Object.assign(new Error("400: can't parse entities"), { response: { error_code: 400 } });
+        if (text.startsWith('report:')) throw new TelegramError(400, "Bad Request: can't parse entities");
       },
     });
     relay.report(report('<odd>'));

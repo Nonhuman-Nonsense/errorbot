@@ -6,6 +6,5 @@ RUN npm ci --omit=dev
 COPY src ./src
 
 EXPOSE 4000
-EXPOSE 4001
 
 CMD ["node", "src/server.ts"]

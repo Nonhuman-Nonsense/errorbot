@@ -13,6 +13,7 @@
  */
 
 import type { Report } from './format.ts';
+import { TelegramError, type SendOptions } from './telegram.ts';
 
 const DEFAULT_WINDOW_MS = 10 * 60_000;
 /** 20 a minute. */
@@ -38,26 +39,6 @@ export function groupKey(body: Report): string {
     normalizeForGrouping(body.context),
     normalizeForGrouping(body.message),
   ].join('|');
-}
-
-/** The parts of a Telegraf error the relay reads. */
-interface TelegramError {
-  code?: unknown;
-  parameters?: { retry_after?: unknown };
-  response?: { error_code?: unknown; parameters?: { retry_after?: unknown } };
-}
-
-function retryAfterMs(err: TelegramError | undefined): number | null {
-  const seconds = err?.response?.parameters?.retry_after ?? err?.parameters?.retry_after;
-  return typeof seconds === 'number' ? seconds * 1000 : null;
-}
-
-function isRateLimited(err: TelegramError | undefined): boolean {
-  return (err?.response?.error_code ?? err?.code) === 429;
-}
-
-export interface SendOptions {
-  parse_mode?: 'HTML';
 }
 
 export interface RelayOptions {
@@ -116,8 +97,8 @@ export function createRelay({
           await send(item.text, item.options);
           queue.shift();
         } catch (err) {
-          if (isRateLimited(err as TelegramError)) {
-            const delay = retryAfterMs(err as TelegramError) ?? minIntervalMs * 10;
+          if (err instanceof TelegramError && err.errorCode === 429) {
+            const delay = err.retryAfter != null ? err.retryAfter * 1000 : minIntervalMs * 10;
             log.warn(`[Relay] Telegram rate limit, retrying in ${delay} ms (${queue.length} queued)`);
             await wait(delay);
             continue;
