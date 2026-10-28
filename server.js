@@ -25,6 +25,7 @@ const chat = process.env.ERRORBOT_CHAT;
 const ingestKey = process.env.ERRORBOT_INGEST_KEY;
 
 const Docker = require('dockerode');
+const { createRelay } = require('./relay.js');
 
 const bot = new Telegraf(token);
 
@@ -77,14 +78,16 @@ function formatRequestParams(requestParams) {
 /**
  * Render an ingest JSON body as a readable Telegram HTML message.
  */
+const SEVERITY_EMOJI = {
+  warning: '⚠️',
+  error: '🔴',
+  critical: '💀',
+  unknown: '❓',
+};
+
 function formatReport(body) {
   const severity = normalizeSeverity(body);
-  const emoji = {
-    warning: '⚠️',
-    error: '🔴',
-    critical: '💀',
-    unknown: '❓',
-  }[severity] ?? '❓';
+  const emoji = SEVERITY_EMOJI[severity] ?? '❓';
 
   const service = body.service ?? 'unknown';
   const source = body.source ?? 'server';
@@ -142,6 +145,27 @@ function formatReport(body) {
   return text;
 }
 
+/**
+ * The one message for reports grouped behind an earlier one (see relay.js): how
+ * many, and enough of the first to recognise it.
+ */
+function formatRepeats(count, body, windowMs) {
+  const severity = normalizeSeverity(body);
+  const minutes = Math.round(windowMs / 60_000);
+  const lines = [
+    `🔁 <b>${count} more like this</b> in the last ${minutes} min · ${SEVERITY_EMOJI[severity] ?? '❓'} <code>${escapeHtml(body.service ?? 'unknown')}</code>`,
+  ];
+  if (body.context) lines.push(`<b>Context:</b> <code>${escapeHtml(body.context)}</code>`);
+  if (body.message) lines.push('', escapeHtml(String(body.message).split('\n')[0]).slice(0, 500));
+  return lines.join('\n');
+}
+
+const relay = createRelay({
+  send: (text, options) => bot.telegram.sendMessage(chat, text, options),
+  format: formatReport,
+  formatRepeats,
+});
+
 const monitorDockerEvents = async () => {
   try {
     const docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -163,7 +187,7 @@ const monitorDockerEvents = async () => {
         if (event.Action.includes('unhealthy')) {
           const containerName = event.Actor.Attributes.name || event.id.substring(0, 12);
           console.log(`[Docker] Unhealthy container detected: ${containerName}`);
-          bot.telegram.sendMessage(chat, `⚠️ *Unhealthy Container Detected*\nName: \`${containerName}\`\nImage: \`${event.Actor.Attributes.image}\``, { parse_mode: 'Markdown' });
+          relay.notify(`⚠️ *Unhealthy Container Detected*\nName: \`${containerName}\`\nImage: \`${event.Actor.Attributes.image}\``, { parse_mode: 'Markdown' });
         }
       } catch (err) {
         console.error('[Docker] Error processing event chunk', err);
@@ -208,12 +232,8 @@ const handleIngest = (req, res) => {
   //Log everything to ourselves
   console.log(req.body);
 
-  //Relay to admin chat
-  const text = formatReport(req.body);
-  bot.telegram.sendMessage(chat, text, { parse_mode: 'HTML' }).catch(err => {
-    console.error('[Ingest] Failed to send formatted Telegram message, falling back to JSON', err);
-    bot.telegram.sendMessage(chat, JSON.stringify(req.body));
-  });
+  //Relay to admin chat: grouped, paced, retried (relay.js)
+  relay.report(req.body ?? {});
 };
 
 // html server
@@ -244,4 +264,4 @@ process.on('SIGINT', () => {
   process.exit(1)
 });
 
-module.exports = { formatReport, escapeHtml, normalizeSeverity };
+module.exports = { formatReport, formatRepeats, escapeHtml, normalizeSeverity };

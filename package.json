@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js --ignore local_db.json",
-    "test": "node --test test/formatReport.test.js",
+    "test": "node --test \"test/*.test.js\"",
     "docker": "docker build . -t nonhumannonsense/error-bot:latest --platform linux/amd64",
     "push": "docker push nonhumannonsense/error-bot:latest"
   },
