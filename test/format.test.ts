@@ -1,12 +1,7 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
-process.env.ERRORBOT_URL = 'http://localhost';
-process.env.ERRORBOT_INGEST_KEY = 'test-key';
-process.env.ERRORBOT_TOKEN = 'test-token';
-process.env.ERRORBOT_CHAT = 'test-chat';
-
-const { formatReport } = require('../server.js');
+import { formatReport } from '../format.ts';
 
 describe('formatReport', () => {
   it('renders critical terminal council reports', () => {

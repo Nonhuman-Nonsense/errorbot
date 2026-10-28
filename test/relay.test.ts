@@ -1,7 +1,8 @@
-const { describe, it, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
+import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
-const { createRelay, groupKey } = require('../relay.js');
+import type { Report } from '../format.ts';
+import { createRelay, groupKey, type RelayOptions } from '../relay.ts';
 
 const WINDOW_MS = 10 * 60_000;
 const INTERVAL_MS = 3_000;
@@ -13,14 +14,14 @@ const settle = async () => {
 
 const quietLog = { warn: () => {}, error: () => {} };
 
-function rateLimited(retryAfterSeconds) {
+function rateLimited(retryAfterSeconds: number) {
   return Object.assign(new Error('429: Too Many Requests'), {
     response: { error_code: 429, parameters: { retry_after: retryAfterSeconds } },
   });
 }
 
-function setup({ send = async () => {}, maxQueue } = {}) {
-  const sent = [];
+function setup({ send = async () => {}, maxQueue }: { send?: RelayOptions['send']; maxQueue?: number } = {}) {
+  const sent: string[] = [];
   const relay = createRelay({
     send: async (text, options) => {
       await send(text, options);
@@ -36,7 +37,7 @@ function setup({ send = async () => {}, maxQueue } = {}) {
   return { relay, sent };
 }
 
-const report = (message, extra = {}) => ({ service: 'CouncilOfForest', severity: 'warning', source: 'server', context: 'api', message, ...extra });
+const report = (message: string, extra: Report = {}): Report => ({ service: 'CouncilOfForest', severity: 'warning', source: 'server', context: 'api', message, ...extra });
 
 describe('relay', () => {
   beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));

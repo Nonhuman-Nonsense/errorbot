@@ -12,6 +12,8 @@
  * - keeps a bounded queue, and says so when it had to drop something.
  */
 
+import type { Report } from './format.ts';
+
 const DEFAULT_WINDOW_MS = 10 * 60_000;
 /** 20 a minute. */
 const DEFAULT_MIN_INTERVAL_MS = 3_000;
@@ -19,7 +21,7 @@ const DEFAULT_MAX_QUEUE = 100;
 const TELEGRAM_MAX = 4096;
 
 /** Ids, counts and timestamps differ between repeats of the same report; the rest says what it is. */
-function normalizeForGrouping(text) {
+function normalizeForGrouping(text: unknown): string {
   return String(text ?? '')
     .split('\n')[0]
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '#')
@@ -28,7 +30,7 @@ function normalizeForGrouping(text) {
 }
 
 /** Reports that are the same thing happening again: same service, severity, source, context and first line. */
-function groupKey(body) {
+export function groupKey(body: Report): string {
   return [
     body.service ?? '',
     body.severity ?? '',
@@ -38,22 +40,47 @@ function groupKey(body) {
   ].join('|');
 }
 
-function retryAfterMs(err) {
+/** The parts of a Telegraf error the relay reads. */
+interface TelegramError {
+  code?: unknown;
+  parameters?: { retry_after?: unknown };
+  response?: { error_code?: unknown; parameters?: { retry_after?: unknown } };
+}
+
+function retryAfterMs(err: TelegramError | undefined): number | null {
   const seconds = err?.response?.parameters?.retry_after ?? err?.parameters?.retry_after;
   return typeof seconds === 'number' ? seconds * 1000 : null;
 }
 
-function isRateLimited(err) {
+function isRateLimited(err: TelegramError | undefined): boolean {
   return (err?.response?.error_code ?? err?.code) === 429;
 }
 
-/**
- * @param {object} deps
- * @param {(text: string, options?: object) => Promise<unknown>} deps.send  posts one message
- * @param {(body: object) => string} deps.format  renders a report as Telegram HTML
- * @param {(count: number, body: object, windowMs: number) => string} deps.formatRepeats  the "N more" message
- */
-function createRelay({
+export interface SendOptions {
+  parse_mode?: 'HTML' | 'Markdown';
+}
+
+export interface RelayOptions {
+  /** Posts one message. */
+  send: (text: string, options?: SendOptions) => Promise<unknown>;
+  /** Renders a report as Telegram HTML. */
+  format: (body: Report) => string;
+  /** The "N more" message. */
+  formatRepeats: (count: number, body: Report, windowMs: number) => string;
+  windowMs?: number;
+  minIntervalMs?: number;
+  maxQueue?: number;
+  log?: Pick<Console, 'warn' | 'error'>;
+}
+
+interface QueueItem {
+  text: string;
+  options?: SendOptions;
+  /** Plain text to send instead if the formatted one is refused. */
+  fallback?: string;
+}
+
+export function createRelay({
   send,
   format,
   formatRepeats,
@@ -61,14 +88,14 @@ function createRelay({
   minIntervalMs = DEFAULT_MIN_INTERVAL_MS,
   maxQueue = DEFAULT_MAX_QUEUE,
   log = console,
-}) {
+}: RelayOptions) {
   /** key → number of repeats since the group's first report went out. */
-  const groups = new Map();
-  const queue = [];
+  const groups = new Map<string, number>();
+  const queue: QueueItem[] = [];
   let pumping = false;
   let dropped = 0;
 
-  const enqueue = (item) => {
+  const enqueue = (item: QueueItem) => {
     if (queue.length >= maxQueue) {
       dropped += 1;
       return;
@@ -77,7 +104,7 @@ function createRelay({
     void pump();
   };
 
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
   const pump = async () => {
     if (pumping) return;
@@ -89,8 +116,8 @@ function createRelay({
           await send(item.text, item.options);
           queue.shift();
         } catch (err) {
-          if (isRateLimited(err)) {
-            const delay = retryAfterMs(err) ?? minIntervalMs * 10;
+          if (isRateLimited(err as TelegramError)) {
+            const delay = retryAfterMs(err as TelegramError) ?? minIntervalMs * 10;
             log.warn(`[Relay] Telegram rate limit, retrying in ${delay} ms (${queue.length} queued)`);
             await wait(delay);
             continue;
@@ -115,15 +142,15 @@ function createRelay({
   };
 
   /** A report from the ingest: sent, or counted towards its group's summary. */
-  const report = (body) => {
+  const report = (body: Report) => {
     const key = groupKey(body);
     if (groups.has(key)) {
-      groups.set(key, groups.get(key) + 1);
+      groups.set(key, (groups.get(key) ?? 0) + 1);
       return;
     }
     groups.set(key, 0);
     setTimeout(() => {
-      const repeats = groups.get(key);
+      const repeats = groups.get(key) ?? 0;
       groups.delete(key);
       if (repeats > 0) enqueue({ text: formatRepeats(repeats, body, windowMs), options: { parse_mode: 'HTML' } });
     }, windowMs);
@@ -135,9 +162,7 @@ function createRelay({
   };
 
   /** Any other message (e.g. a Docker health alert): paced with the reports, never grouped. */
-  const notify = (text, options) => enqueue({ text, options });
+  const notify = (text: string, options?: SendOptions) => enqueue({ text, options });
 
   return { report, notify };
 }
-
-module.exports = { createRelay, groupKey };
