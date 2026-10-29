@@ -58,7 +58,7 @@ If HTML formatting fails, the bot falls back to `JSON.stringify(body)`.
 
 ## Development
 
-Needs Node 24 or later. The code is TypeScript that Node runs directly (type stripping), so there is no build step; `tsc` only checks types.
+Needs Node 26 or later. The code is TypeScript that Node runs directly (type stripping), so there is no build step; `tsc` only checks types.
 
 - `npm run dev` - runs the server and restarts it on changes.
 - `npm test` - type-checks, then runs the tests.

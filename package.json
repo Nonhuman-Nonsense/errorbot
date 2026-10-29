@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A telegram relay bot for error messaging",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "type": "module",
   "main": "src/server.ts",
@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/dockerode": "^4.0.2",
     "@types/express": "^5.0.6",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   }
 }
